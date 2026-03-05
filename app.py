@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, jsonify
-import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import json
+import math
 
 app = Flask(__name__)
 
@@ -41,36 +39,39 @@ movies_data = [
     {"id":30,"title":"There Will Be Blood","genres":"Drama","director":"Paul Thomas Anderson","cast":"Daniel Day-Lewis Paul Dano","description":"A story of family religion hatred oil and madness featuring Daniel Plainview a silver miner turned oilman","year":2007,"rating":8.2},
 ]
 
-df = pd.DataFrame(movies_data)
+# ─── BUILD TAGS & SIMILARITY MATRIX ──────────────────────────────────────────
+for m in movies_data:
+    m['tags'] = f"{m['genres']} {m['director']} {m['cast']} {m['description']}"
 
-def build_tags(row):
-    return f"{row['genres']} {row['director']} {row['cast']} {row['description']}"
-
-df['tags'] = df.apply(build_tags, axis=1)
+tags_list = [m['tags'] for m in movies_data]
 
 tfidf = TfidfVectorizer(stop_words='english', max_features=5000)
-tfidf_matrix = tfidf.fit_transform(df['tags'])
+tfidf_matrix = tfidf.fit_transform(tags_list)
 cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
+# ─── RECOMMENDATION FUNCTION ──────────────────────────────────────────────────
 def get_recommendations(movie_title, n=6):
     movie_title_lower = movie_title.lower().strip()
-    matches = df[df['title'].str.lower().str.contains(movie_title_lower)]
-    if matches.empty:
+    idx = None
+    for i, m in enumerate(movies_data):
+        if movie_title_lower in m['title'].lower():
+            idx = i
+            break
+    if idx is None:
         return None, []
-    idx = matches.index[0]
-    movie = df.iloc[idx].to_dict()
+    movie = {k: v for k, v in movies_data[idx].items() if k != 'tags'}
     sim_scores = list(enumerate(cosine_sim[idx]))
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
     sim_scores = [s for s in sim_scores if s[0] != idx][:n]
     recommended = []
     for i, score in sim_scores:
-        rec = df.iloc[i].to_dict()
+        rec = {k: v for k, v in movies_data[i].items() if k != 'tags'}
         rec['similarity'] = round(float(score) * 100, 1)
         recommended.append(rec)
     return movie, recommended
 
 def get_all_titles():
-    return sorted(df['title'].tolist())
+    return sorted([m['title'] for m in movies_data])
 
 # ─── ROUTES ───────────────────────────────────────────────────────────────────
 @app.route('/')
@@ -89,7 +90,7 @@ def recommend():
 
 @app.route('/all-movies')
 def all_movies():
-    return jsonify(df[['id','title','genres','year','rating']].to_dict(orient='records'))
+    return jsonify([{k: v for k, v in m.items() if k != 'tags'} for m in movies_data])
 
 if __name__ == '__main__':
     app.run(debug=True)
