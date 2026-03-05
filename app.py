@@ -93,4 +93,14 @@ def all_movies():
     return jsonify([{k: v for k, v in m.items() if k != 'tags'} for m in movies_data])
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+```
+3. Commit changes ✅
+
+**Update `Procfile`:**
+1. Click `Procfile` → ✏️ pencil
+2. Delete everything → paste:
+```
+web: gunicorn app:app --bind 0.0.0.0:$PORT
