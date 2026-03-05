@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CineMatch — Movie Recommendation System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060910;
+    --surface: #0d1117;
+    --card: #111820;
+    --border: #1e2a38;
+    --gold: #e8b84b;
+    --gold-dim: #a07c28;
+    --text: #e8eaf0;
+    --muted: #6b7a8d;
+    --accent: #3d8ef0;
+    --danger: #e05a5a;
+    --green: #4caf82;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── NOISE OVERLAY ─────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0; opacity: 0.6;
+  }
+
+  /* ─── HERO GLOW ─────────────────────────────── */
+  .glow-orb {
+    position: fixed;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,184,75,0.06) 0%, transparent 70%);
+    top: -200px; left: 50%; transform: translateX(-50%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ─── HEADER ────────────────────────────────── */
+  header {
+    position: relative; z-index: 10;
+    text-align: center;
+    padding: 60px 20px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-strip {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(232,184,75,0.08);
+    border: 1px solid rgba(232,184,75,0.2);
+    border-radius: 100px;
+    padding: 6px 18px; margin-bottom: 28px;
+    font-size: 11px; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--gold);
+  }
+
+  .logo-strip span { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; display: inline-block; }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.8rem, 6vw, 5rem);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -1px;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--gold);
+    display: block;
+  }
+
+  .tagline {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 1rem;
+    font-weight: 300;
+    letter-spacing: 0.3px;
+  }
+
+  /* ─── SEARCH ZONE ───────────────────────────── */
+  .search-zone {
+    position: relative; z-index: 10;
+    max-width: 680px; margin: 50px auto 0;
+    padding: 0 20px;
+  }
+
+  .search-label {
+    font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 10px; display: block;
+  }
+
+  .search-wrap {
+    position: relative;
+    display: flex; gap: 12px;
+  }
+
+  .search-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    list-style: none;
+  }
+
+  .search-input:focus {
+    border-color: var(--gold-dim);
+    box-shadow: 0 0 0 3px rgba(232,184,75,0.08);
+  }
+
+  .search-input::placeholder { color: var(--muted); }
+
+  .search-btn {
+    background: var(--gold);
+    color: #060910;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 28px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+
+  .search-btn:hover { opacity: 0.88; }
+  .search-btn:active { transform: scale(0.97); }
+
+  /* Autocomplete */
+  .autocomplete-list {
+    position: absolute; top: calc(100% + 6px); left: 0;
+    right: 120px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: none; z-index: 100;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+
+  .autocomplete-list.show { display: block; }
+
+  .autocomplete-item {
+    padding: 12px 18px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .autocomplete-item:last-child { border-bottom: none; }
+  .autocomplete-item:hover { background: rgba(232,184,75,0.06); }
+
+  /* ─── QUICK PICKS ───────────────────────────── */
+  .quick-picks {
+    position: relative; z-index: 10;
+    max-width: 680px; margin: 16px auto 0;
+    padding: 0 20px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    align-items: center;
+  }
+
+  .quick-label { font-size: 11px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  .pill {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 100px;
+    padding: 5px 14px; font-size: 0.78rem;
+    cursor: pointer; transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .pill:hover { border-color: var(--gold-dim); color: var(--gold); background: rgba(232,184,75,0.05); }
+
+  /* ─── LOADING ───────────────────────────────── */
+  .loader {
+    display: none; text-align: center;
+    padding: 60px 20px; position: relative; z-index: 10;
+  }
+
+  .loader.show { display: block; }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── ERROR ─────────────────────────────────── */
+  .error-msg {
+    display: none; text-align: center;
+    padding: 30px; color: var(--danger);
+    font-size: 0.95rem; position: relative; z-index: 10;
+  }
+  .error-msg.show { display: block; }
+
+  /* ─── RESULTS ───────────────────────────────── */
+  #results { position: relative; z-index: 10; }
+
+  /* Selected Movie Banner */
+  .selected-movie {
+    max-width: 900px; margin: 60px auto 0;
+    padding: 0 20px;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .selected-inner {
+    background: linear-gradient(135deg, var(--card) 0%, rgba(232,184,75,0.04) 100%);
+    border: 1px solid rgba(232,184,75,0.2);
+    border-radius: 20px;
+    padding: 36px 40px;
+    display: flex; gap: 32px; align-items: flex-start;
+  }
+
+  .movie-poster-placeholder {
+    flex-shrink: 0;
+    width: 90px; height: 130px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1a2332 0%, #0d1520 100%);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+    font-size: 2.2rem;
+  }
+
+  .selected-info { flex: 1; }
+
+  .now-watching {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--gold); margin-bottom: 10px; display: block;
+  }
+
+  .selected-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.9rem; font-weight: 700; margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    margin-bottom: 14px; align-items: center;
+  }
+
+  .meta-badge {
+    font-size: 0.78rem; padding: 3px 10px;
+    border-radius: 6px; background: var(--border);
+    color: var(--muted);
+  }
+
+  .rating-badge {
+    background: rgba(232,184,75,0.12);
+    color: var(--gold); border: 1px solid rgba(232,184,75,0.25);
+    font-weight: 500;
+  }
+
+  .selected-desc {
+    color: var(--muted); font-size: 0.9rem; line-height: 1.6;
+  }
+
+  /* Recommendations Grid */
+  .rec-section {
+    max-width: 900px; margin: 50px auto 80px;
+    padding: 0 20px;
+    animation: fadeUp 0.5s 0.15s ease both;
+  }
+
+  .section-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+  }
+
+  .section-line {
+    flex: 1; height: 1px; background: var(--border);
+  }
+
+  .section-count {
+    font-size: 0.78rem; color: var(--muted);
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 100px; padding: 3px 12px;
+  }
+
+  .rec-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+  }
+
+  .rec-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    cursor: pointer;
+    transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .rec-card:hover {
+    border-color: rgba(232,184,75,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  }
+
+  .card-top {
+    display: flex; justify-content: space-between;
+    align-items: flex-start; margin-bottom: 14px;
+  }
+
+  .card-emoji { font-size: 1.8rem; }
+
+  .similarity-ring {
+    text-align: right;
+  }
+
+  .similarity-pct {
+    font-size: 1.1rem; font-weight: 500; color: var(--green);
+    display: block;
+  }
+
+  .similarity-label {
+    font-size: 0.68rem; color: var(--muted); letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .card-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .card-genres {
+    font-size: 0.75rem; color: var(--muted); margin-bottom: 10px;
+  }
+
+  .card-desc {
+    font-size: 0.82rem; color: #4a5568; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+
+  .card-footer {
+    margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  .card-year { font-size: 0.78rem; color: var(--muted); }
+  .card-rating { font-size: 0.78rem; color: var(--gold); }
+
+  /* ─── EMPTY STATE ───────────────────────────── */
+  .empty-state {
+    text-align: center; padding: 80px 20px;
+    position: relative; z-index: 10;
+  }
+
+  .empty-icon { font-size: 4rem; margin-bottom: 20px; opacity: 0.5; }
+  .empty-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem; margin-bottom: 10px; color: var(--muted);
+  }
+  .empty-sub { font-size: 0.9rem; color: #3a4558; }
+
+  /* ─── FOOTER ────────────────────────────────── */
+  footer {
+    text-align: center; padding: 30px;
+    border-top: 1px solid var(--border);
+    font-size: 0.78rem; color: var(--muted);
+    position: relative; z-index: 10;
+  }
+
+  footer strong { color: var(--gold); }
+
+  /* ─── REPORT SECTION ────────────────────────── */
+  .report-section {
+    max-width: 900px; margin: 0 auto 60px;
+    padding: 0 20px;
+    animation: fadeUp 0.5s 0.25s ease both;
+  }
+
+  .report-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px 32px;
+  }
+
+  .report-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 20px;
+  }
+
+  .stat-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+  }
+
+  .stat-item { text-align: center; }
+
+  .stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem; color: var(--gold);
+    display: block; margin-bottom: 4px;
+  }
+
+  .stat-key { font-size: 0.75rem; color: var(--muted); }
+
+  /* ─── RESPONSIVE ────────────────────────────── */
+  @media (max-width: 600px) {
+    .selected-inner { flex-direction: column; padding: 24px; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .search-wrap { flex-direction: column; }
+    .search-btn { width: 100%; }
+    .autocomplete-list { right: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-orb"></div>
+
+<!-- ─── HEADER ──────────────────────────────────────────────────── -->
+<header>
+  <div class="logo-strip"><span></span> AI Powered &nbsp;·&nbsp; Mini Project CS-281-FP <span></span></div>
+  <h1>Cine<em>Match</em></h1>
+  <p class="tagline">Content-based movie recommendations using TF-IDF &amp; Cosine Similarity</p>
+</header>
+
+<!-- ─── SEARCH ───────────────────────────────────────────────────── -->
+<div class="search-zone">
+  <label class="search-label">Enter a movie you like</label>
+  <div class="search-wrap" style="position:relative">
+    <input
+      type="text"
+      id="searchInput"
+      class="search-input"
+      placeholder="e.g. Inception, The Matrix, Dune…"
+      autocomplete="off"
+    />
+    <div class="autocomplete-list" id="autoList"></div>
+    <button class="search-btn" onclick="doSearch()">Find Movies →</button>
+  </div>
+</div>
+
+<div class="quick-picks">
+  <span class="quick-label">Try:</span>
+  {% for title in titles[:8] %}
+  <button class="pill" onclick="quickPick('{{ title }}')">{{ title }}</button>
+  {% endfor %}
+</div>
+
+<!-- ─── STATES ───────────────────────────────────────────────────── -->
+<div class="loader" id="loader">
+  <div class="spinner"></div>
+  <p style="color:var(--muted); font-size:0.88rem;">Finding your next favourite film…</p>
+</div>
+
+<div class="error-msg" id="errorMsg"></div>
+
+<!-- ─── RESULTS ──────────────────────────────────────────────────── -->
+<div id="results">
+  <div class="empty-state">
+    <div class="empty-icon">🎬</div>
+    <div class="empty-title">Your recommendations will appear here</div>
+    <div class="empty-sub">Search for a movie above to get started</div>
+  </div>
+</div>
+
+<!-- ─── FOOTER ───────────────────────────────────────────────────── -->
+<footer>
+  <strong>CineMatch</strong> &nbsp;·&nbsp; S.Y.B.Sc. CS Mini Project &nbsp;·&nbsp; CS-281-FP &nbsp;·&nbsp;
+  Built with Python · Flask · TF-IDF · Cosine Similarity
+</footer>
+
+<script>
+  const allTitles = {{ titles | tojson }};
+
+  // ─── AUTOCOMPLETE ──────────────────────────────────
+  const input   = document.getElementById('searchInput');
+  const autoList = document.getElementById('autoList');
+
+  input.addEventListener('input', () => {
+    const val = input.value.trim().toLowerCase();
+    autoList.innerHTML = '';
+    if (!val) { autoList.classList.remove('show'); return; }
+    const hits = allTitles.filter(t => t.toLowerCase().includes(val)).slice(0, 6);
+    if (!hits.length) { autoList.classList.remove('show'); return; }
+    hits.forEach(t => {
+      const d = document.createElement('div');
+      d.className = 'autocomplete-item';
+      d.textContent = t;
+      d.onclick = () => { input.value = t; autoList.classList.remove('show'); doSearch(); };
+      autoList.appendChild(d);
+    });
+    autoList.classList.add('show');
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.search-wrap')) autoList.classList.remove('show');
+  });
+
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+
+  function quickPick(title) {
+    input.value = title;
+    doSearch();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ─── SEARCH ────────────────────────────────────────
+  function doSearch() {
+    const movie = input.value.trim();
+    if (!movie) return;
+    autoList.classList.remove('show');
+
+    document.getElementById('loader').classList.add('show');
+    document.getElementById('errorMsg').classList.remove('show');
+    document.getElementById('results').innerHTML = '';
+
+    fetch('/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ movie })
+    })
+    .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+    .then(({ ok, data }) => {
+      document.getElementById('loader').classList.remove('show');
+      if (!ok) {
+        const err = document.getElementById('errorMsg');
+        err.textContent = '🎭 ' + (data.error || 'Movie not found. Try another title!');
+        err.classList.add('show');
+        return;
+      }
+      renderResults(data);
+    })
+    .catch(() => {
+      document.getElementById('loader').classList.remove('show');
+      const err = document.getElementById('errorMsg');
+      err.textContent = '⚠️ Something went wrong. Please try again.';
+      err.classList.add('show');
+    });
+  }
+
+  // ─── RENDER ────────────────────────────────────────
+  const EMOJIS = ['🎬','🎥','🍿','🎭','⭐','🌟','🎞️','🏆'];
+
+  function renderResults({ movie, recommendations }) {
+    const avgSim = recommendations.length
+      ? (recommendations.reduce((a,r) => a + r.similarity, 0) / recommendations.length).toFixed(1)
+      : 0;
+
+    const html = `
+      <!-- Selected Movie -->
+      <div class="selected-movie">
+        <div class="selected-inner">
+          <div class="movie-poster-placeholder">🎬</div>
+          <div class="selected-info">
+            <span class="now-watching">Selected Movie</span>
+            <div class="selected-title">${movie.title}</div>
+            <div class="meta-row">
+              <span class="meta-badge rating-badge">⭐ ${movie.rating}/10</span>
+              <span class="meta-badge">${movie.year}</span>
+              ${movie.genres.split(' ').map(g => `<span class="meta-badge">${g}</span>`).join('')}
+            </div>
+            <div class="selected-desc">${movie.description}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Stats -->
+      <div class="report-section" style="margin-top:24px;">
+        <div class="report-box">
+          <div class="report-title">📊 Analysis Report</div>
+          <div class="stat-row">
+            <div class="stat-item">
+              <span class="stat-val">${recommendations.length}</span>
+              <span class="stat-key">Movies Found</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val">${avgSim}%</span>
+              <span class="stat-key">Avg. Similarity</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val">${recommendations[0]?.similarity || 0}%</span>
+              <span class="stat-key">Top Match</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-val">TF-IDF</span>
+              <span class="stat-key">Algorithm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendations -->
+      <div class="rec-section">
+        <div class="section-header">
+          <div class="section-title">Recommended For You</div>
+          <div class="section-line"></div>
+          <div class="section-count">${recommendations.length} results</div>
+        </div>
+        <div class="rec-grid">
+          ${recommendations.map((r, i) => `
+            <div class="rec-card" style="animation-delay:${i * 0.07}s" onclick="quickPick('${r.title.replace(/'/g,"\\'")}')">
+              <div class="card-top">
+                <span class="card-emoji">${EMOJIS[i % EMOJIS.length]}</span>
+                <div class="similarity-ring">
+                  <span class="similarity-pct">${r.similarity}%</span>
+                  <span class="similarity-label">match</span>
+                </div>
+              </div>
+              <div class="card-title">${r.title}</div>
+              <div class="card-genres">${r.genres.split(' ').join(' · ')}</div>
+              <div class="card-desc">${r.description}</div>
+              <div class="card-footer">
+                <span class="card-year">${r.year} · ${r.director.split(' ').slice(-1)[0]}</span>
+                <span class="card-rating">⭐ ${r.rating}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.getElementById('results').innerHTML = html;
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+</body>
+</html>
